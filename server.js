@@ -2,17 +2,6 @@
  * Adobe Universal Editor — Custom Service + Content Backend
  * ──────────────────────────────────────────────────────────
  * Runs on Render.com (free tier).
- *
- * Endpoints the Adobe Editor calls:
- *   POST  /update    — save content edits (main UE endpoint)
- *   PATCH /update    — save content edits (alternate)
- *   POST  /details   — get resource metadata for properties panel
- *   GET   /details   — get resource metadata
- *
- * Our content API:
- *   GET   /              health check
- *   GET   /api/content   return all content JSON
- *   PATCH /api/content   update a field directly (for testing)
  */
 
 const express = require('express');
@@ -43,17 +32,31 @@ function saveContent(data) {
 
 let content = loadContent();
 
-// ── CORS — must come before everything else ────────────────
-// Adobe's editor sends custom headers like X-Features, X-Adobe-Event, etc.
-// Using wildcard on headers is the only reliable fix.
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', '*');
-  res.header('Access-Control-Allow-Credentials', 'false');
-  res.header('Access-Control-Max-Age', '86400'); // cache preflight for 24h
+// ── CORS ───────────────────────────────────────────────────
+// Adobe sends requests with credentials:'include' so we CANNOT
+// use wildcard '*' — we must echo back the exact requesting origin.
+const ALLOWED_ORIGINS = [
+  'https://experience.adobe.com',
+  'https://universal-editor-9lo.pages.dev',
+];
 
-  // Preflight — must respond immediately with 204, no body
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  // Echo back the exact origin (required when credentials:'include')
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Features, X-Adobe-Event, X-Adobe-Event-Id, X-Forwarded-Host, X-Forwarded-Proto, X-Request-Id'
+  );
+  res.header('Access-Control-Max-Age', '86400');
+
+  // Preflight — respond immediately, no body
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
@@ -64,7 +67,11 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ── Health check ───────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+//  STANDARD ENDPOINTS
+// ══════════════════════════════════════════════════════════
+
+// Health check
 app.get('/', (req, res) => {
   res.json({
     service: 'NovaTech UE Demo Backend',
@@ -73,13 +80,27 @@ app.get('/', (req, res) => {
   });
 });
 
+// /configuration — Adobe UE calls this on startup to discover the service
+app.get('/configuration', (req, res) => {
+  console.log('[GET /configuration]');
+  res.json({
+    status: 'ok',
+    version: '1.0.0',
+    connections: [
+      {
+        name: 'demobackend',
+        protocol: 'demobackend',
+        uri: 'https://ue-demo-backend.onrender.com',
+      },
+    ],
+  });
+});
+
 // ══════════════════════════════════════════════════════════
 //  ADOBE UNIVERSAL EDITOR ENDPOINTS
-//  The editor calls these when the author edits and saves
 // ══════════════════════════════════════════════════════════
 
-// /details — called by UE to get metadata about a resource
-// Used to populate the Properties panel on the right side
+// /details — called to get resource metadata for the Properties panel
 app.get('/details', (req, res) => {
   console.log('[GET /details]', req.query);
   res.json({ status: 'ok', properties: {} });
@@ -93,14 +114,13 @@ app.post('/details', (req, res) => {
   });
 });
 
-// /update — called by UE when author saves an edit
-// This is the main endpoint Adobe's editor uses (not PATCH /)
-app.post('/update', handleUEUpdate);
-app.get('/update', (req, res) => res.json({ status: 'ok' }));
+// /update — called when author saves an edit in the canvas
+app.get('/update',   (req, res) => res.json({ status: 'ok' }));
+app.post('/update',  handleUEUpdate);
 app.patch('/update', handleUEUpdate);
 
-// Also handle root PATCH/POST for older UE versions
-app.post('/', handleUEUpdate);
+// Root PATCH/POST for older UE versions
+app.post('/',  handleUEUpdate);
 app.patch('/', handleUEUpdate);
 
 function handleUEUpdate(req, res) {
@@ -111,11 +131,11 @@ function handleUEUpdate(req, res) {
     const target  = body.target  || {};
     const patches = body.patch   || [];
 
-    // Parse resource URN → content key
-    // e.g. "urn:demobackend:/content/hero"       → sectionKey="hero", arrayIndex=null
-    //      "urn:demobackend:/content/features/1"  → sectionKey="features", arrayIndex=0
+    // Parse resource URN → content section key + optional array index
+    // "urn:demobackend:/content/hero"       → sectionKey="hero",     arrayIndex=null
+    // "urn:demobackend:/content/features/1" → sectionKey="features", arrayIndex=0
     const resource    = target.resource || '';
-    const contentPath = resource.replace(/^urn:[^:]+:/, '');          // strip urn:xxx:
+    const contentPath = resource.replace(/^urn:[^:]+:/, '');
     const parts       = contentPath.replace(/^\/content\//, '').split('/');
     const sectionKey  = parts[0];
     const arrayIndex  = parts[1] ? parseInt(parts[1], 10) - 1 : null;
@@ -124,12 +144,12 @@ function handleUEUpdate(req, res) {
       return res.status(400).json({ error: 'Could not parse resource URN' });
     }
 
-    // Create section if it doesn't exist yet
+    // Create section if missing
     if (!content[sectionKey]) {
       content[sectionKey] = arrayIndex !== null ? [] : {};
     }
 
-    // Apply JSON patch operations (op: replace / add)
+    // Apply JSON patch operations
     if (patches.length > 0) {
       patches.forEach(op => {
         if (op.op !== 'replace' && op.op !== 'add') return;
@@ -145,7 +165,7 @@ function handleUEUpdate(req, res) {
       });
     }
 
-    // Fallback: simple single-prop update (some UE versions send this)
+    // Fallback: single-prop update (some UE versions send this format)
     if (patches.length === 0 && target.prop) {
       const prop  = target.prop;
       const value = body.value ?? body.data ?? '';
@@ -159,7 +179,7 @@ function handleUEUpdate(req, res) {
     }
 
     saveContent(content);
-    console.log(`[SAVED] ${sectionKey}`, arrayIndex !== null ? `[${arrayIndex}]` : '');
+    console.log(`[SAVED] ${sectionKey}${arrayIndex !== null ? `[${arrayIndex}]` : ''}`);
 
     res.status(200).json({
       ok: true,
@@ -179,7 +199,7 @@ function handleUEUpdate(req, res) {
 //  CONTENT API
 // ══════════════════════════════════════════════════════════
 
-// GET /api/content — full content (frontend calls this on page load)
+// GET /api/content — full content (frontend fetches this on page load)
 app.get('/api/content', (req, res) => {
   res.json(content);
 });
@@ -193,7 +213,7 @@ app.get('/api/content/:key', (req, res) => {
   res.json(section);
 });
 
-// PATCH /api/content — update a field directly (for Postman/curl testing)
+// PATCH /api/content — direct update for testing with curl/Postman
 // Body: { "key": "hero", "prop": "headline", "value": "Hello!" }
 app.patch('/api/content', (req, res) => {
   const { key, prop, value } = req.body;
@@ -213,8 +233,9 @@ app.patch('/api/content', (req, res) => {
 // ── Start ──────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`✅ NovaTech UE Backend running on port ${PORT}`);
-  console.log(`   Health:      http://localhost:${PORT}/`);
-  console.log(`   Content API: http://localhost:${PORT}/api/content`);
-  console.log(`   UE update:   http://localhost:${PORT}/update  (POST/PATCH)`);
-  console.log(`   UE details:  http://localhost:${PORT}/details (GET/POST)`);
+  console.log(`   Health:        http://localhost:${PORT}/`);
+  console.log(`   Configuration: http://localhost:${PORT}/configuration`);
+  console.log(`   Content API:   http://localhost:${PORT}/api/content`);
+  console.log(`   UE update:     http://localhost:${PORT}/update  (POST/PATCH)`);
+  console.log(`   UE details:    http://localhost:${PORT}/details (GET/POST)`);
 });
