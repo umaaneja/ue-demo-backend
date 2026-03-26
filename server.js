@@ -113,15 +113,35 @@ app.post('/configuration', (req, res) => {
 
 // /details — called to get resource metadata for the Properties panel
 app.get('/details', (req, res) => {
-  console.log('[GET /details]', req.query);
-  res.json({ status: 'ok', properties: {} });
+  res.json({ status: 'ok' });
 });
 
 app.post('/details', (req, res) => {
   console.log('[POST /details]', JSON.stringify(req.body, null, 2));
+
+  const target = req.body?.target || {};
+  const prop   = target.prop || '';
+  const type   = target.type || 'text';
+
+  // Return a field model so the properties panel renders an input
   res.json({
-    resource: req.body?.target?.resource || '',
-    properties: {},
+    resource: target.resource || '',
+    properties: {
+      [prop]: {
+        label: target.label || prop,
+        value: '',          // editor fills this from the DOM
+        type,
+        // field model definition
+        fields: [
+          {
+            name: prop,
+            label: target.label || prop,
+            component: type === 'richtext' ? 'richtext' : 'text',
+            valueType: 'string',
+          }
+        ]
+      }
+    }
   });
 });
 
