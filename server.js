@@ -33,15 +33,12 @@ function saveContent(data) {
 let content = loadContent();
 
 // ── CORS ───────────────────────────────────────────────────
-// Adobe sends requests with credentials:'include' so we must:
-//   1. Echo back the exact requesting origin (not wildcard *)
-//   2. Reflect back whatever headers Adobe asks for in the preflight
-//      because Adobe sends dynamic headers like x-demobackend-authorization
-//      that change based on your connection name and cannot be hardcoded
+// Must echo back exact origin (not *) because Adobe sends credentials:'include'
+// Must reflect requested headers because Adobe sends dynamic ones like
+// x-demobackend-authorization that can't be hardcoded
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  // Echo back exact origin — required when credentials:'include'
   if (origin) {
     res.header('Access-Control-Allow-Origin', origin);
   }
@@ -49,9 +46,7 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
 
-  // Reflect back whatever headers the preflight asks for
-  // This handles x-demobackend-authorization and any other
-  // dynamic headers Adobe generates from your connection name
+  // Reflect back whatever headers the preflight requests
   const requestedHeaders = req.headers['access-control-request-headers'];
   if (requestedHeaders) {
     res.header('Access-Control-Allow-Headers', requestedHeaders);
@@ -61,7 +56,6 @@ app.use((req, res, next) => {
 
   res.header('Access-Control-Max-Age', '86400');
 
-  // Preflight — respond immediately with no body
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
@@ -76,7 +70,6 @@ app.use(express.urlencoded({ extended: true }));
 //  STANDARD ENDPOINTS
 // ══════════════════════════════════════════════════════════
 
-// Health check
 app.get('/', (req, res) => {
   res.json({
     service: 'NovaTech UE Demo Backend',
@@ -85,7 +78,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// /configuration — Adobe UE calls this on startup
+// /configuration — Adobe UE calls on startup
 app.get('/configuration', (req, res) => {
   console.log('[GET /configuration]');
   res.json({
@@ -94,16 +87,15 @@ app.get('/configuration', (req, res) => {
     connections: [
       {
         name: 'demobackend',
-        protocol: 'demobackend',
+        protocol: 'custom',
         uri: 'https://ue-demo-backend.onrender.com',
       },
     ],
   });
 });
 
-// Adobe also POSTs to /configuration
 app.post('/configuration', (req, res) => {
-  console.log('[POST /configuration]', JSON.stringify(req.body, null, 2));
+  console.log('[POST /configuration]');
   res.json({ status: 'ok' });
 });
 
@@ -111,60 +103,63 @@ app.post('/configuration', (req, res) => {
 //  ADOBE UNIVERSAL EDITOR ENDPOINTS
 // ══════════════════════════════════════════════════════════
 
-// /details — called to get resource metadata for the Properties panel
+// /details — returns field values for the properties panel
+// Adobe calls this when a component is selected in the canvas
 app.get('/details', (req, res) => {
+  console.log('[GET /details]', req.query);
   res.json({ status: 'ok' });
 });
 
 app.post('/details', (req, res) => {
   console.log('[POST /details]', JSON.stringify(req.body, null, 2));
 
-  const target = req.body?.target || {};
-  const prop   = target.prop || '';
-  const type   = target.type || 'text';
+  try {
+    const target = req.body?.target || {};
+    const resource = target.resource || '';
 
-  // Return a field model so the properties panel renders an input
-  res.json({
-    resource: target.resource || '',
-    properties: {
-      [prop]: {
-        label: target.label || prop,
-        value: '',          // editor fills this from the DOM
-        type,
-        // field model definition
-        fields: [
-          {
-            name: prop,
-            label: target.label || prop,
-            component: type === 'richtext' ? 'richtext' : 'text',
-            valueType: 'string',
-          }
-        ]
+    // Parse URN to find current field values
+    const contentPath = resource.replace(/^urn:[^:]+:/, '');
+    const parts       = contentPath.replace(/^\/content\//, '').split('/');
+    const sectionKey  = parts[0];
+    const arrayIndex  = parts[1] ? parseInt(parts[1], 10) - 1 : null;
+
+    let currentData = {};
+    if (sectionKey && content[sectionKey]) {
+      if (arrayIndex !== null && Array.isArray(content[sectionKey])) {
+        currentData = content[sectionKey][arrayIndex] || {};
+      } else {
+        currentData = content[sectionKey] || {};
       }
     }
-  });
+
+    // Return current field values so the properties panel is pre-filled
+    res.json({
+      resource,
+      properties: currentData,
+    });
+
+  } catch (err) {
+    console.error('[/details error]', err);
+    // Always return 200 with empty data — never let /details crash
+    res.json({ resource: '', properties: {} });
+  }
 });
 
-// /update — called when author saves an edit in the canvas
+// /update — called when author saves an edit
 app.get('/update',   (req, res) => res.json({ status: 'ok' }));
 app.post('/update',  handleUEUpdate);
 app.patch('/update', handleUEUpdate);
-
-// Root PATCH/POST for older UE versions
-app.post('/',  handleUEUpdate);
-app.patch('/', handleUEUpdate);
+app.post('/',        handleUEUpdate);
+app.patch('/',       handleUEUpdate);
 
 function handleUEUpdate(req, res) {
   try {
-    const body = req.body;
-    console.log(`[${req.method} ${req.path}]`, JSON.stringify(body, null, 2));
-
+    const body    = req.body;
     const target  = body.target  || {};
     const patches = body.patch   || [];
 
-    // Parse resource URN → content section key + optional array index
-    // "urn:demobackend:/content/hero"       → sectionKey="hero",     arrayIndex=null
-    // "urn:demobackend:/content/features/1" → sectionKey="features", arrayIndex=0
+    console.log(`[${req.method} ${req.path}]`, JSON.stringify(body, null, 2));
+
     const resource    = target.resource || '';
     const contentPath = resource.replace(/^urn:[^:]+:/, '');
     const parts       = contentPath.replace(/^\/content\//, '').split('/');
@@ -175,7 +170,6 @@ function handleUEUpdate(req, res) {
       return res.status(400).json({ error: 'Could not parse resource URN' });
     }
 
-    // Create section if missing
     if (!content[sectionKey]) {
       content[sectionKey] = arrayIndex !== null ? [] : {};
     }
@@ -196,7 +190,7 @@ function handleUEUpdate(req, res) {
       });
     }
 
-    // Fallback: single-prop update (some UE versions send this format)
+    // Fallback: single-prop update
     if (patches.length === 0 && target.prop) {
       const prop  = target.prop;
       const value = body.value ?? body.data ?? '';
@@ -230,12 +224,10 @@ function handleUEUpdate(req, res) {
 //  CONTENT API
 // ══════════════════════════════════════════════════════════
 
-// GET /api/content — full content (frontend fetches this on page load)
 app.get('/api/content', (req, res) => {
   res.json(content);
 });
 
-// GET /api/content/:key — single section
 app.get('/api/content/:key', (req, res) => {
   const section = content[req.params.key];
   if (section === undefined) {
@@ -244,8 +236,6 @@ app.get('/api/content/:key', (req, res) => {
   res.json(section);
 });
 
-// PATCH /api/content — direct update for testing with curl/Postman
-// Body: { "key": "hero", "prop": "headline", "value": "Hello!" }
 app.patch('/api/content', (req, res) => {
   const { key, prop, value } = req.body;
   if (!key) return res.status(400).json({ error: '"key" is required' });
@@ -267,6 +257,6 @@ app.listen(PORT, () => {
   console.log(`   Health:        http://localhost:${PORT}/`);
   console.log(`   Configuration: http://localhost:${PORT}/configuration`);
   console.log(`   Content API:   http://localhost:${PORT}/api/content`);
-  console.log(`   UE update:     http://localhost:${PORT}/update  (POST/PATCH)`);
-  console.log(`   UE details:    http://localhost:${PORT}/details (GET/POST)`);
+  console.log(`   UE update:     http://localhost:${PORT}/update`);
+  console.log(`   UE details:    http://localhost:${PORT}/details`);
 });
