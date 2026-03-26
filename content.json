@@ -1,0 +1,74 @@
+{
+  "hero": {
+    "badge": "New → Now with AI",
+    "headline": "Build faster with <span>NovaTech</span>",
+    "description": "The platform that helps modern teams ship products <strong>3x faster</strong> with AI-assisted workflows, real-time collaboration, and zero DevOps overhead.",
+    "ctaPrimary": "Start for free",
+    "ctaSecondary": "Watch demo",
+    "heroImage": ""
+  },
+
+  "stats": {
+    "stat1Value": "50K+",
+    "stat1Label": "Teams using NovaTech",
+    "stat2Value": "99.9%",
+    "stat2Label": "Uptime SLA",
+    "stat3Value": "3x",
+    "stat3Label": "Faster time to ship"
+  },
+
+  "features-header": {
+    "eyebrow": "Everything you need",
+    "title": "Built for teams who move fast"
+  },
+
+  "features": [
+    {
+      "icon": "⚡",
+      "title": "AI-Powered Workflows",
+      "description": "Automate repetitive tasks with intelligent agents that learn your team's patterns and adapt over time."
+    },
+    {
+      "icon": "👥",
+      "title": "Real-Time Collaboration",
+      "description": "Work alongside your team simultaneously with conflict-free editing, live cursors, and instant sync."
+    },
+    {
+      "icon": "🛡️",
+      "title": "Zero DevOps Overhead",
+      "description": "Deploy globally in seconds. No servers to manage, no pipelines to maintain — we handle all the infrastructure."
+    }
+  ],
+
+  "team-header": {
+    "eyebrow": "The people behind it",
+    "title": "Meet our team"
+  },
+
+  "team": [
+    {
+      "avatar": "👩‍💻",
+      "name": "Sarah Chen",
+      "role": "Co-founder & CEO",
+      "bio": "Former engineering lead at Stripe. Obsessed with developer experience and building things that last."
+    },
+    {
+      "avatar": "👨‍🎨",
+      "name": "Marcus Okafor",
+      "role": "Head of Design",
+      "bio": "Designed products used by millions at Figma and Notion. Believes great design is invisible."
+    },
+    {
+      "avatar": "👩‍🔬",
+      "name": "Priya Nair",
+      "role": "VP of Engineering",
+      "bio": "PhD in distributed systems. Led infrastructure at Cloudflare before joining NovaTech."
+    }
+  ],
+
+  "cta": {
+    "headline": "Ready to ship faster?",
+    "subtext": "Join 50,000+ teams already using NovaTech.",
+    "buttonText": "Get started free"
+  }
+}
