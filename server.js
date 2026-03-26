@@ -3,22 +3,19 @@
  * ──────────────────────────────────────────────────────────
  * Runs on Render.com (free tier).
  *
- * This server does two jobs:
- *  1. Acts as the Universal Editor Service endpoint — receives
- *     PATCH requests from the Adobe editor when authors save.
- *  2. Stores and serves content as JSON for the frontend to read.
+ * Endpoints the Adobe Editor calls:
+ *   POST  /update    — save content edits (main UE endpoint)
+ *   PATCH /update    — save content edits (alternate)
+ *   POST  /details   — get resource metadata for properties panel
+ *   GET   /details   — get resource metadata
  *
- * Endpoints:
- *   GET  /                  health check
- *   GET  /api/content       return full content JSON
- *   GET  /api/content/:key  return one content section
- *   PATCH /                 UE service protocol — receive edits
- *   PATCH /api/content      update content directly (for testing)
- *   GET  /corslib/LATEST    serves the UE cors.js (proxy to Adobe CDN)
+ * Our content API:
+ *   GET   /              health check
+ *   GET   /api/content   return all content JSON
+ *   PATCH /api/content   update a field directly (for testing)
  */
 
 const express = require('express');
-const cors    = require('cors');
 const fs      = require('fs');
 const path    = require('path');
 
@@ -26,9 +23,6 @@ const app  = express();
 const PORT = process.env.PORT || 3001;
 
 // ── Content store ──────────────────────────────────────────
-// In production swap this for a real DB (MongoDB, Postgres, etc.)
-// For this demo we read from content.json on disk and keep a
-// live in-memory copy so edits survive without a restart.
 const CONTENT_FILE = path.join(__dirname, 'content.json');
 
 function loadContent() {
@@ -49,30 +43,26 @@ function saveContent(data) {
 
 let content = loadContent();
 
-// ── Middleware ─────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
+// ── CORS — must come before everything else ────────────────
+// Adobe's editor sends custom headers like X-Features, X-Adobe-Event, etc.
+// Using wildcard on headers is the only reliable fix.
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Allow-Credentials', 'false');
+  res.header('Access-Control-Max-Age', '86400'); // cache preflight for 24h
 
-// CORS — allow the Adobe editor (experience.adobe.com) and
-// your Cloudflare Pages domain.
-app.use(cors({
-  origin: (origin, cb) => {
-    const allowed = [
-      'https://experience.adobe.com',
-      'https://universal-editor-service.adobe.io',
-      // Add your Cloudflare Pages URL:
-      process.env.FRONTEND_URL || '*',
-    ];
-    if (!origin || allowed.includes('*') || allowed.some(o => origin.startsWith(o.replace('*', '')))) {
-      cb(null, true);
-    } else {
-      cb(null, true); // allow all for demo — restrict in production
-    }
-  },
-  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Forwarded-Host',
-                   'X-Adobe-Event', 'X-Adobe-Event-Id'],
-  credentials: true,
-}));
+  // Preflight — must respond immediately with 204, no body
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+// ── Body parsing ───────────────────────────────────────────
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // ── Health check ───────────────────────────────────────────
 app.get('/', (req, res) => {
@@ -83,26 +73,130 @@ app.get('/', (req, res) => {
   });
 });
 
-// ── Content API ────────────────────────────────────────────
-// GET /api/content — return all content
+// ══════════════════════════════════════════════════════════
+//  ADOBE UNIVERSAL EDITOR ENDPOINTS
+//  The editor calls these when the author edits and saves
+// ══════════════════════════════════════════════════════════
+
+// /details — called by UE to get metadata about a resource
+// Used to populate the Properties panel on the right side
+app.get('/details', (req, res) => {
+  console.log('[GET /details]', req.query);
+  res.json({ status: 'ok', properties: {} });
+});
+
+app.post('/details', (req, res) => {
+  console.log('[POST /details]', JSON.stringify(req.body, null, 2));
+  res.json({
+    resource: req.body?.target?.resource || '',
+    properties: {},
+  });
+});
+
+// /update — called by UE when author saves an edit
+// This is the main endpoint Adobe's editor uses (not PATCH /)
+app.post('/update', handleUEUpdate);
+app.patch('/update', handleUEUpdate);
+
+// Also handle root PATCH/POST for older UE versions
+app.post('/', handleUEUpdate);
+app.patch('/', handleUEUpdate);
+
+function handleUEUpdate(req, res) {
+  try {
+    const body = req.body;
+    console.log(`[${req.method} ${req.path}]`, JSON.stringify(body, null, 2));
+
+    const target  = body.target  || {};
+    const patches = body.patch   || [];
+
+    // Parse resource URN → content key
+    // e.g. "urn:demobackend:/content/hero"       → sectionKey="hero", arrayIndex=null
+    //      "urn:demobackend:/content/features/1"  → sectionKey="features", arrayIndex=0
+    const resource    = target.resource || '';
+    const contentPath = resource.replace(/^urn:[^:]+:/, '');          // strip urn:xxx:
+    const parts       = contentPath.replace(/^\/content\//, '').split('/');
+    const sectionKey  = parts[0];
+    const arrayIndex  = parts[1] ? parseInt(parts[1], 10) - 1 : null;
+
+    if (!sectionKey) {
+      return res.status(400).json({ error: 'Could not parse resource URN' });
+    }
+
+    // Create section if it doesn't exist yet
+    if (!content[sectionKey]) {
+      content[sectionKey] = arrayIndex !== null ? [] : {};
+    }
+
+    // Apply JSON patch operations (op: replace / add)
+    if (patches.length > 0) {
+      patches.forEach(op => {
+        if (op.op !== 'replace' && op.op !== 'add') return;
+        const prop  = op.path.replace(/^\//, '');
+        const value = op.value;
+
+        if (arrayIndex !== null && Array.isArray(content[sectionKey])) {
+          if (!content[sectionKey][arrayIndex]) content[sectionKey][arrayIndex] = {};
+          content[sectionKey][arrayIndex][prop] = value;
+        } else {
+          content[sectionKey][prop] = value;
+        }
+      });
+    }
+
+    // Fallback: simple single-prop update (some UE versions send this)
+    if (patches.length === 0 && target.prop) {
+      const prop  = target.prop;
+      const value = body.value ?? body.data ?? '';
+
+      if (arrayIndex !== null && Array.isArray(content[sectionKey])) {
+        if (!content[sectionKey][arrayIndex]) content[sectionKey][arrayIndex] = {};
+        content[sectionKey][arrayIndex][prop] = value;
+      } else {
+        content[sectionKey][prop] = value;
+      }
+    }
+
+    saveContent(content);
+    console.log(`[SAVED] ${sectionKey}`, arrayIndex !== null ? `[${arrayIndex}]` : '');
+
+    res.status(200).json({
+      ok: true,
+      resource: target.resource,
+      updated: arrayIndex !== null
+        ? content[sectionKey][arrayIndex]
+        : content[sectionKey],
+    });
+
+  } catch (err) {
+    console.error('[UE update error]', err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  CONTENT API
+// ══════════════════════════════════════════════════════════
+
+// GET /api/content — full content (frontend calls this on page load)
 app.get('/api/content', (req, res) => {
   res.json(content);
 });
 
-// GET /api/content/:key — return one section (e.g. /api/content/hero)
+// GET /api/content/:key — single section
 app.get('/api/content/:key', (req, res) => {
   const section = content[req.params.key];
   if (section === undefined) {
-    return res.status(404).json({ error: 'Section not found' });
+    return res.status(404).json({ error: `Section "${req.params.key}" not found` });
   }
   res.json(section);
 });
 
-// PATCH /api/content — direct update (for Postman testing)
-// Body: { "key": "hero", "prop": "headline", "value": "Hello World" }
+// PATCH /api/content — update a field directly (for Postman/curl testing)
+// Body: { "key": "hero", "prop": "headline", "value": "Hello!" }
 app.patch('/api/content', (req, res) => {
   const { key, prop, value } = req.body;
-  if (!key) return res.status(400).json({ error: 'key required' });
+  if (!key) return res.status(400).json({ error: '"key" is required' });
 
   if (!content[key]) content[key] = {};
   if (prop) {
@@ -115,130 +209,11 @@ app.patch('/api/content', (req, res) => {
   res.json({ ok: true, updated: { key, prop, value } });
 });
 
-// ── Universal Editor Service Protocol ─────────────────────
-//
-// When an author edits something in the UE canvas and hits save,
-// the editor sends a PATCH (or POST) request to the service URL
-// configured in the meta tag:
-//   <meta name="urn:adobe:aue:config:service" content="https://your-backend.onrender.com">
-//
-// Body shape the UE sends:
-// {
-//   "connections": [{ "name": "demobackend", "protocol": "demobackend", "uri": "..." }],
-//   "target": {
-//     "resource": "urn:demobackend:/content/hero",
-//     "prop": "headline",
-//     "type": "text"
-//   },
-//   "patch": [{ "op": "replace", "path": "/headline", "value": "New headline" }]
-// }
-//
-// We parse the resource URN to find the content key, then apply the patch.
-// ────────────────────────────────────────────────────────────
-app.patch('/', handleUEPatch);
-app.post('/', handleUEPatch);   // some UE versions use POST
-
-function handleUEPatch(req, res) {
-  try {
-    const body = req.body;
-    console.log('[UE PATCH]', JSON.stringify(body, null, 2));
-
-    const target = body.target || {};
-    const patches = body.patch || [];
-
-    // Parse the resource URN: urn:demobackend:/content/hero  →  "hero"
-    // or urn:demobackend:/content/features/1  →  "features" (array index 0)
-    const resource = target.resource || '';
-    const contentPath = resource.replace(/^urn:[^:]+:/, '');   // strip urn prefix
-    const parts = contentPath.replace(/^\/content\//, '').split('/');
-    // parts[0] = section key (e.g. "hero", "features", "team")
-    // parts[1] = optional array index (e.g. "1" for features/1)
-
-    const sectionKey = parts[0];
-    const arrayIndex = parts[1] ? parseInt(parts[1], 10) - 1 : null;
-
-    if (!sectionKey || !content.hasOwnProperty(sectionKey)) {
-      return res.status(404).json({ error: `Unknown content section: ${sectionKey}` });
-    }
-
-    // Apply each patch operation
-    patches.forEach(op => {
-      if (op.op !== 'replace' && op.op !== 'add') return;
-
-      // op.path looks like "/headline" or "/title"
-      const prop = op.path.replace(/^\//, '');
-      const value = op.value;
-
-      if (arrayIndex !== null && Array.isArray(content[sectionKey])) {
-        if (!content[sectionKey][arrayIndex]) {
-          content[sectionKey][arrayIndex] = {};
-        }
-        content[sectionKey][arrayIndex][prop] = value;
-      } else {
-        content[sectionKey][prop] = value;
-      }
-    });
-
-    // Also handle simple single-prop updates from the editor
-    if (patches.length === 0 && target.prop) {
-      const prop  = target.prop;
-      const value = body.value ?? body.data ?? '';
-      if (arrayIndex !== null && Array.isArray(content[sectionKey])) {
-        if (!content[sectionKey][arrayIndex]) content[sectionKey][arrayIndex] = {};
-        content[sectionKey][arrayIndex][prop] = value;
-      } else {
-        content[sectionKey][prop] = value;
-      }
-    }
-
-    saveContent(content);
-
-    // UE expects a 200 with the updated resource
-    res.status(200).json({
-      ok: true,
-      resource: target.resource,
-      updated: content[sectionKey],
-    });
-
-  } catch (err) {
-    console.error('[UE PATCH error]', err);
-    res.status(500).json({ error: err.message });
-  }
-}
-
-// ── UE Details endpoint ────────────────────────────────────
-// The UE editor sometimes calls /details to get metadata
-// about a resource (used for the Properties panel).
-app.get('/details', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-app.post('/details', (req, res) => {
-  const { connections, target } = req.body || {};
-  // Return minimal metadata so the Properties panel renders
-  res.json({
-    resource: target?.resource,
-    properties: {},
-  });
-});
-
-// ── CORS library proxy (optional convenience) ──────────────
-// If you ever point cors.js at this backend, we proxy it.
-app.get('/corslib/LATEST', async (req, res) => {
-  try {
-    const { default: https } = await import('https');
-    https.get('https://universal-editor-service.adobe.io/cors.js', r => {
-      res.setHeader('Content-Type', 'application/javascript');
-      r.pipe(res);
-    }).on('error', () => res.status(503).send(''));
-  } catch {
-    res.status(503).send('');
-  }
-});
-
 // ── Start ──────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`✅ NovaTech UE Backend running on port ${PORT}`);
-  console.log(`   Content API:  http://localhost:${PORT}/api/content`);
-  console.log(`   UE Service:   http://localhost:${PORT}/  (PATCH)`);
+  console.log(`   Health:      http://localhost:${PORT}/`);
+  console.log(`   Content API: http://localhost:${PORT}/api/content`);
+  console.log(`   UE update:   http://localhost:${PORT}/update  (POST/PATCH)`);
+  console.log(`   UE details:  http://localhost:${PORT}/details (GET/POST)`);
 });
