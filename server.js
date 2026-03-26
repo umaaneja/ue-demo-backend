@@ -33,30 +33,35 @@ function saveContent(data) {
 let content = loadContent();
 
 // ── CORS ───────────────────────────────────────────────────
-// Adobe sends requests with credentials:'include' so we CANNOT
-// use wildcard '*' — we must echo back the exact requesting origin.
-const ALLOWED_ORIGINS = [
-  'https://experience.adobe.com',
-  'https://universal-editor-9lo.pages.dev',
-];
-
+// Adobe sends requests with credentials:'include' so we must:
+//   1. Echo back the exact requesting origin (not wildcard *)
+//   2. Reflect back whatever headers Adobe asks for in the preflight
+//      because Adobe sends dynamic headers like x-demobackend-authorization
+//      that change based on your connection name and cannot be hardcoded
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  // Echo back the exact origin (required when credentials:'include')
+  // Echo back exact origin — required when credentials:'include'
   if (origin) {
     res.header('Access-Control-Allow-Origin', origin);
   }
 
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, X-Features, X-Adobe-Event, X-Adobe-Event-Id, X-Forwarded-Host, X-Forwarded-Proto, X-Request-Id'
-  );
+
+  // Reflect back whatever headers the preflight asks for
+  // This handles x-demobackend-authorization and any other
+  // dynamic headers Adobe generates from your connection name
+  const requestedHeaders = req.headers['access-control-request-headers'];
+  if (requestedHeaders) {
+    res.header('Access-Control-Allow-Headers', requestedHeaders);
+  } else {
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+
   res.header('Access-Control-Max-Age', '86400');
 
-  // Preflight — respond immediately, no body
+  // Preflight — respond immediately with no body
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
@@ -80,7 +85,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// /configuration — Adobe UE calls this on startup to discover the service
+// /configuration — Adobe UE calls this on startup
 app.get('/configuration', (req, res) => {
   console.log('[GET /configuration]');
   res.json({
@@ -94,6 +99,12 @@ app.get('/configuration', (req, res) => {
       },
     ],
   });
+});
+
+// Adobe also POSTs to /configuration
+app.post('/configuration', (req, res) => {
+  console.log('[POST /configuration]', JSON.stringify(req.body, null, 2));
+  res.json({ status: 'ok' });
 });
 
 // ══════════════════════════════════════════════════════════
