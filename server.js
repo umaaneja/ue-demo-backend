@@ -96,6 +96,7 @@ app.post('/details', (req, res) => {
 // /update — called by UE when author saves an edit
 // This is the main endpoint Adobe's editor uses (not PATCH /)
 app.post('/update', handleUEUpdate);
+app.get('/update', (req, res) => res.json({ status: 'ok' }));
 app.patch('/update', handleUEUpdate);
 
 // Also handle root PATCH/POST for older UE versions
