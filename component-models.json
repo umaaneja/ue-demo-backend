@@ -1,0 +1,128 @@
+[
+  {
+    "id": "hero",
+    "fields": [
+      { "component": "text",     "name": "badge",        "label": "Badge Text",      "valueType": "string" },
+      { "component": "text",     "name": "headline",     "label": "Headline",        "valueType": "string" },
+      { "component": "richtext", "name": "description",  "label": "Description",     "valueType": "string" },
+      { "component": "text",     "name": "ctaPrimary",   "label": "Primary Button",  "valueType": "string" },
+      { "component": "text",     "name": "ctaSecondary", "label": "Secondary Button","valueType": "string" }
+    ]
+  },
+  {
+    "id": "stats",
+    "fields": [
+      { "component": "text", "name": "stat1Value", "label": "Stat 1 Number", "valueType": "string" },
+      { "component": "text", "name": "stat1Label", "label": "Stat 1 Label",  "valueType": "string" },
+      { "component": "text", "name": "stat2Value", "label": "Stat 2 Number", "valueType": "string" },
+      { "component": "text", "name": "stat2Label", "label": "Stat 2 Label",  "valueType": "string" },
+      { "component": "text", "name": "stat3Value", "label": "Stat 3 Number", "valueType": "string" },
+      { "component": "text", "name": "stat3Label", "label": "Stat 3 Label",  "valueType": "string" }
+    ]
+  },
+  {
+    "id": "features-header",
+    "fields": [
+      { "component": "text", "name": "eyebrow", "label": "Eyebrow", "valueType": "string" },
+      { "component": "text", "name": "title",   "label": "Heading", "valueType": "string" }
+    ]
+  },
+  {
+    "id": "feature",
+    "fields": [
+      { "component": "text",     "name": "icon",        "label": "Icon (emoji)", "valueType": "string" },
+      { "component": "text",     "name": "title",       "label": "Title",        "valueType": "string" },
+      { "component": "richtext", "name": "description", "label": "Description",  "valueType": "string" }
+    ]
+  },
+  {
+    "id": "team-header",
+    "fields": [
+      { "component": "text", "name": "eyebrow", "label": "Eyebrow", "valueType": "string" },
+      { "component": "text", "name": "title",   "label": "Heading", "valueType": "string" }
+    ]
+  },
+  {
+    "id": "team-member",
+    "fields": [
+      { "component": "text",     "name": "avatar", "label": "Avatar (emoji)", "valueType": "string" },
+      { "component": "text",     "name": "name",   "label": "Name",           "valueType": "string" },
+      { "component": "text",     "name": "role",   "label": "Role",           "valueType": "string" },
+      { "component": "richtext", "name": "bio",    "label": "Bio",            "valueType": "string" }
+    ]
+  },
+  {
+    "id": "cta",
+    "fields": [
+      { "component": "text", "name": "headline",   "label": "Headline", "valueType": "string" },
+      { "component": "text", "name": "subtext",    "label": "Subtext",  "valueType": "string" },
+      { "component": "text", "name": "buttonText", "label": "Button",   "valueType": "string" }
+    ]
+  },
+  {
+    "id": "pricing-hero",
+    "fields": [
+      { "component": "text", "name": "eyebrow",      "label": "Eyebrow",       "valueType": "string" },
+      { "component": "text", "name": "headline",     "label": "Headline",      "valueType": "string" },
+      { "component": "text", "name": "description",  "label": "Description",   "valueType": "string" },
+      { "component": "text", "name": "savingsBadge", "label": "Savings Badge", "valueType": "string" }
+    ]
+  },
+  {
+    "id": "pricing-plan",
+    "fields": [
+      { "component": "text", "name": "name",        "label": "Plan Name",    "valueType": "string" },
+      { "component": "text", "name": "description", "label": "Description",  "valueType": "string" },
+      { "component": "text", "name": "price",       "label": "Price",        "valueType": "string" },
+      { "component": "text", "name": "period",      "label": "Period",       "valueType": "string" },
+      { "component": "text", "name": "ctaText",     "label": "Button Label", "valueType": "string" },
+      { "component": "text", "name": "badge",       "label": "Badge Label",  "valueType": "string" }
+    ]
+  },
+  {
+    "id": "faq-header",
+    "fields": [
+      { "component": "text", "name": "title",    "label": "Heading",   "valueType": "string" },
+      { "component": "text", "name": "subtitle", "label": "Subtitle",  "valueType": "string" }
+    ]
+  },
+  {
+    "id": "faq-item",
+    "fields": [
+      { "component": "text",     "name": "question", "label": "Question", "valueType": "string" },
+      { "component": "richtext", "name": "answer",   "label": "Answer",   "valueType": "string" }
+    ]
+  },
+  {
+    "id": "about-mission",
+    "fields": [
+      { "component": "text",     "name": "eyebrow",  "label": "Eyebrow",     "valueType": "string" },
+      { "component": "text",     "name": "headline",  "label": "Headline",    "valueType": "string" },
+      { "component": "richtext", "name": "body1",     "label": "Paragraph 1", "valueType": "string" },
+      { "component": "richtext", "name": "body2",     "label": "Paragraph 2", "valueType": "string" }
+    ]
+  },
+  {
+    "id": "section-header",
+    "fields": [
+      { "component": "text", "name": "eyebrow", "label": "Eyebrow", "valueType": "string" },
+      { "component": "text", "name": "title",   "label": "Heading", "valueType": "string" }
+    ]
+  },
+  {
+    "id": "value-card",
+    "fields": [
+      { "component": "text",     "name": "icon",        "label": "Icon (emoji)", "valueType": "string" },
+      { "component": "text",     "name": "title",       "label": "Title",        "valueType": "string" },
+      { "component": "richtext", "name": "description", "label": "Description",  "valueType": "string" }
+    ]
+  },
+  {
+    "id": "milestone",
+    "fields": [
+      { "component": "text", "name": "year",        "label": "Year",        "valueType": "string" },
+      { "component": "text", "name": "title",       "label": "Title",       "valueType": "string" },
+      { "component": "text", "name": "description", "label": "Description", "valueType": "string" }
+    ]
+  }
+]

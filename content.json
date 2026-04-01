@@ -1,0 +1,134 @@
+{
+  "hero": {
+    "badge": "New → Now with AI",
+    "headline": "Build faster with <span>NovaTech</span>",
+    "description": "The platform that helps modern teams ship products <strong>3x faster</strong> with AI-assisted workflows, real-time collaboration, and zero DevOps overhead.",
+    "ctaPrimary": "Start for free",
+    "ctaSecondary": "Watch demo"
+  },
+
+  "stats": {
+    "stat1Value": "50K+",
+    "stat1Label": "Teams using NovaTech",
+    "stat2Value": "99.9%",
+    "stat2Label": "Uptime SLA",
+    "stat3Value": "3x",
+    "stat3Label": "Faster time to ship"
+  },
+
+  "features-header": {
+    "eyebrow": "Everything you need",
+    "title": "Built for teams who move fast"
+  },
+
+  "features": [
+    { "icon": "⚡", "title": "AI-Powered Workflows",     "description": "Automate repetitive tasks with intelligent agents that learn your team's patterns and adapt over time." },
+    { "icon": "👥", "title": "Real-Time Collaboration",  "description": "Work alongside your team simultaneously with conflict-free editing, live cursors, and instant sync." },
+    { "icon": "🛡️", "title": "Zero DevOps Overhead",    "description": "Deploy globally in seconds. No servers to manage, no pipelines to maintain — we handle all the infrastructure." }
+  ],
+
+  "team-header": {
+    "eyebrow": "The people behind it",
+    "title": "Meet our team"
+  },
+
+  "team": [
+    { "avatar": "👩‍💻", "name": "Sarah Chen",    "role": "Co-founder & CEO",    "bio": "Former engineering lead at Stripe. Obsessed with developer experience and building things that last." },
+    { "avatar": "👨‍🎨", "name": "Marcus Okafor", "role": "Head of Design",       "bio": "Designed products used by millions at Figma and Notion. Believes great design is invisible." },
+    { "avatar": "👩‍🔬", "name": "Priya Nair",    "role": "VP of Engineering",    "bio": "PhD in distributed systems. Led infrastructure at Cloudflare before joining NovaTech." }
+  ],
+
+  "cta": {
+    "headline": "Ready to ship faster?",
+    "subtext": "Join 50,000+ teams already using NovaTech.",
+    "buttonText": "Get started free"
+  },
+
+  "pricing-hero": {
+    "eyebrow": "Simple pricing",
+    "headline": "Plans for every team",
+    "description": "Start free, scale as you grow. No hidden fees, cancel anytime.",
+    "savingsBadge": "Save 20%"
+  },
+
+  "pricing-plans": [
+    {
+      "name": "Starter",
+      "description": "Perfect for individuals and small projects.",
+      "price": "$0",
+      "period": "/ month",
+      "ctaText": "Get started free",
+      "badge": ""
+    },
+    {
+      "name": "Pro",
+      "description": "For growing teams that need more power.",
+      "price": "$49",
+      "period": "/ month",
+      "ctaText": "Start free trial",
+      "badge": "Most popular"
+    },
+    {
+      "name": "Enterprise",
+      "description": "Custom solutions for large organisations.",
+      "price": "Custom",
+      "period": "",
+      "ctaText": "Talk to sales",
+      "badge": ""
+    }
+  ],
+
+  "faq-header": {
+    "title": "Frequently asked questions",
+    "subtitle": "Can't find the answer? Chat with our team."
+  },
+
+  "faqs": [
+    { "question": "Can I change plans later?",              "answer": "Yes, you can upgrade or downgrade at any time. Changes take effect immediately and billing is prorated." },
+    { "question": "Is there a free trial?",                 "answer": "All paid plans include a 14-day free trial. No credit card required to start." },
+    { "question": "What payment methods do you accept?",    "answer": "We accept all major credit cards, PayPal, and bank transfers for annual plans." }
+  ],
+
+  "pricing-cta": {
+    "headline": "Still not sure? Try it free.",
+    "subtext": "No credit card. No commitment. Cancel anytime.",
+    "buttonText": "Start for free"
+  },
+
+  "about-mission": {
+    "eyebrow": "Our story",
+    "headline": "We're on a mission to eliminate DevOps friction",
+    "body1": "NovaTech was founded in 2021 by a team of engineers frustrated with the complexity of modern deployment pipelines. We believed there had to be a better way.",
+    "body2": "Today we serve over 50,000 teams across 90 countries, helping them ship products <strong>faster and with more confidence</strong> than ever before."
+  },
+
+  "values-header": {
+    "eyebrow": "What drives us",
+    "title": "Our core values"
+  },
+
+  "values": [
+    { "icon": "🚀", "title": "Speed over perfection",  "description": "We ship fast, learn from real users, and iterate constantly. Done is better than perfect." },
+    { "icon": "🤝", "title": "Trust by default",       "description": "We hire great people and trust them to do great work. No micromanagement, ever." },
+    { "icon": "🔍", "title": "Radical transparency",   "description": "We share everything — metrics, failures, and strategy — with our team and our customers." },
+    { "icon": "🌱", "title": "Long-term thinking",     "description": "We optimise for decades, not quarters. Sustainable growth over short-term wins." }
+  ],
+
+  "milestones-header": {
+    "eyebrow": "Our journey",
+    "title": "Key milestones"
+  },
+
+  "milestones": [
+    { "year": "2021", "title": "Founded in San Francisco", "description": "Three engineers quit their jobs to build a better way to ship software." },
+    { "year": "2022", "title": "$8M Seed Round",           "description": "Raised seed funding from Accel and Y Combinator. Grew to 12 team members." },
+    { "year": "2023", "title": "10,000 customers",         "description": "Hit 10K paying customers. Launched AI workflows feature." },
+    { "year": "2025", "title": "50,000+ teams globally",   "description": "Expanded to 90 countries. Series B of $60M. 200+ team members worldwide." }
+  ],
+
+  "about-cta": {
+    "headline": "Want to join the team?",
+    "subtext": "We're hiring across engineering, design, and sales.",
+    "buttonText": "View open roles"
+  }
+}
